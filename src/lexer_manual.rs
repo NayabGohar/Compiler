@@ -1,5 +1,4 @@
-// Manual lexer (Version B) - NO regex, NO 3rd-party crates.
-// Outputs tokens in the format requested, e.g. T_FUNCTION, T_IDENTIFIER("my_fn"), T_PARENL, etc.
+
 
 use std::fmt;
 
@@ -354,9 +353,6 @@ pub fn lexer_manual(code: &str) -> Result<Vec<Token>, String> {
     Ok(tokens)
 }
 
-// --------------------------------------
-// Main: many test cases demonstrating features
-// --------------------------------------
 fn main() {
     let tests: Vec<(&str, &str)> = vec![
         ("Sample program (from prompt)", r#"
@@ -414,3 +410,4 @@ int 123abc = 5;
         }
     }
 }
+
