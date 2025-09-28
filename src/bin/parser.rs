@@ -1,3 +1,4 @@
+//works with lexer_regex
 use lexer_project::lexer_regex::{Lexer, Token};
 use std::fs::File;
 use std::io::Write;
@@ -454,4 +455,5 @@ fn main() {
     run_and_print(more);
 
     println!("\nMade 'language_bnf.md'.");
+
 }
