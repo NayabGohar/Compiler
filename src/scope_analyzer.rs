@@ -230,7 +230,6 @@ impl ScopeAnalyzer {
         None
     }
 
-    /// 🪡 Print the spaghetti stack for visualization
     fn print_scope_stack(&self) {
         println!(" Spaghetti stack (innermost last):");
         for (i, scope) in self.scopes.iter().enumerate() {
@@ -239,3 +238,4 @@ impl ScopeAnalyzer {
         println!();
     }
 }
+
