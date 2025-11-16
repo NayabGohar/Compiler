@@ -12,18 +12,15 @@ fn main() {
         int a = 5;
     "#;
 
-    // lexer + parser
     let lexer = Lexer::new();
     let tokens = lexer.tokenize(src);
     let mut parser = Parser::new(tokens);
     let ast = parser.parse_program().expect("parse error");
 
-    // scope analysis (populate symbol table)
     let mut sa = ScopeAnalyzer::new();
     sa.analyze(&ast);
 
-    // type checking reusing scope analyzer
-    let mut tc = TypeChecker::new(&mut sa); // <-- use new() instead of from_scope_analyzer
+    let mut tc = TypeChecker::new(&mut sa); 
     let has_errors = tc.check_program(&ast);
 
     if has_errors {
@@ -35,3 +32,4 @@ fn main() {
         println!("No type errors ");
     }
 }
+
