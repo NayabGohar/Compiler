@@ -138,9 +138,9 @@ impl<'a> TypeChecker<'a> {
                 l.or(r)
             }
             Call { name: _, args: _ } => {
-                // Function call type inference skipped for brevity
                 None
             }
         }
     }
 }
+
