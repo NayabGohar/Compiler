@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use crate::parser_regex::{Decl, FnDecl, Stmt, Expr};
 
-/// Errors that may occur during IR generation
 #[derive(Debug, Clone)]
 pub enum IRGenError {
     ReturnOutsideFunction,
@@ -11,7 +10,6 @@ pub enum IRGenError {
     Other(String),
 }
 
-/// A simple operand in TAC: either a temporary, a named local, or a constant literal.
 #[derive(Debug, Clone)]
 pub enum Operand {
     Temp(String),
@@ -34,29 +32,18 @@ impl fmt::Display for Operand {
     }
 }
 
-/// TAC instructions (simple but expressive)
 #[derive(Debug, Clone)]
 pub enum Instr {
     Label(String),
-    /// dest = operand (move)
     Assign { dest: Operand, src: Operand },
-    /// dest = lhs op rhs
     Binary { op: String, dest: Operand, lhs: Operand, rhs: Operand },
-    /// dest = unary op rhs
     Unary { op: String, dest: Operand, rhs: Operand },
-    /// param x
     Param(Operand),
-    /// dest = call name, nargs
     Call { dest: Option<Operand>, name: String, nargs: usize },
-    /// return [operand?]
     Return(Option<Operand>),
-    /// goto label
     Goto(String),
-    /// if cond_temp goto label
     IfGoto { cond: Operand, label: String },
-    /// function entry
     FuncBegin(String),
-    /// function end
     FuncEnd(String),
 }
 
@@ -86,19 +73,15 @@ impl fmt::Display for Instr {
     }
 }
 
-/// Result of IR generation per function
 pub struct FunctionIR {
     pub name: String,
     pub instrs: Vec<Instr>,
 }
 
-/// IR generator
 pub struct IRGenerator {
     temp_counter: usize,
     label_counter: usize,
-    /// mapping current function locals (var name -> local operand)
     locals: HashMap<String, Operand>,
-    /// Collected errors
     pub errors: Vec<IRGenError>,
 }
 
@@ -128,11 +111,9 @@ impl IRGenerator {
         l
     }
 
-    /// Top-level: generate TAC for a whole program
     pub fn generate(&mut self, prog: &Vec<Decl>) -> Vec<FunctionIR> {
         let mut out = Vec::new();
 
-        // Each top-level function -> generate function IR
         for decl in prog.iter() {
             if let Decl::FnDecl(fd) = decl {
                 out.push(self.generate_function(fd));
@@ -144,24 +125,21 @@ impl IRGenerator {
 
     fn generate_function(&mut self, f: &FnDecl) -> FunctionIR {
         self.locals.clear();
-        self.temp_counter = 0; // optionally reset per-function for readability
+        self.temp_counter = 0; 
         let mut instrs = Vec::new();
 
         instrs.push(Instr::FuncBegin(f.ident.clone()));
 
-        // allocate locals for params (map param names to local names)
         for p in &f.params {
             let lname = IRGenerator::local_name(&p.ident);
             let op = Operand::Local(lname.clone());
             self.locals.insert(p.ident.clone(), op.clone());
         }
 
-        // Lower function body
         for s in &f.block {
             self.lower_stmt(s, &mut instrs);
         }
 
-        // If function returns void and no explicit return, add `return` (we just end function)
         instrs.push(Instr::FuncEnd(f.ident.clone()));
 
         FunctionIR {
@@ -174,13 +152,10 @@ impl IRGenerator {
         use Stmt::*;
         match s {
             Var(v) => {
-                // create a local name
                 let lname = IRGenerator::local_name(&v.ident);
                 let local_op = Operand::Local(lname.clone());
-                // remember local mapping
                 self.locals.insert(v.ident.clone(), local_op.clone());
 
-                // If there's an initializer, lower the expression and assign
                 if let Some(e) = &v.expr {
                     if let Some(val) = self.lower_expr(e, out) {
                         out.push(Instr::Assign { dest: local_op, src: val });
@@ -189,7 +164,6 @@ impl IRGenerator {
             }
             ExprStmt(opt_e) => {
                 if let Some(e) = opt_e {
-                    // Lower and discard result
                     let _ = self.lower_expr(e, out);
                 }
             }
@@ -210,9 +184,7 @@ impl IRGenerator {
                 let end_label = self.new_label("ifend");
 
                 if let Some(cop) = self.lower_expr(cond, out) {
-                    // if cond goto then_label
                     out.push(Instr::IfGoto { cond: cop, label: then_label.clone() });
-                    // else branch
                     out.push(Instr::Goto(else_label.clone()));
 
                     out.push(Instr::Label(then_label.clone()));
@@ -248,13 +220,11 @@ impl IRGenerator {
                 }
             }
             Block(inner) => {
-                // Blocks do not change IR but may in a real compiler affect scopes
                 for st in inner { self.lower_stmt(st, out); }
             }
         }
     }
 
-    /// Lower expression and return an operand (temp/local/literal) that holds the result.
     fn lower_expr(&mut self, e: &Expr, out: &mut Vec<Instr>) -> Option<Operand> {
         use Expr::*;
         match e {
@@ -266,16 +236,13 @@ impl IRGenerator {
                 if let Some(op) = self.locals.get(name) {
                     Some(op.clone())
                 } else {
-                    // fallback: treat as global name (v_name)
                     let gl = Operand::Local(IRGenerator::local_name(name));
                     Some(gl)
                 }
             }
             Unary { op, rhs } => {
                 if let Some(r) = self.lower_expr(rhs, out) {
-                    // create result temp
                     let dest = self.new_temp();
-                    // map operator token to string
                     let opname = match op {
                         crate::lexer_regex::Token::T_MINUS => "-".to_string(),
                         crate::lexer_regex::Token::T_NOT => "!".to_string(),
@@ -289,7 +256,6 @@ impl IRGenerator {
                 let l = self.lower_expr(lhs, out)?;
                 let r = self.lower_expr(rhs, out)?;
                 let dest = self.new_temp();
-                // map token to op string
                 let opname = match op {
                     crate::lexer_regex::Token::T_PLUS => "+",
                     crate::lexer_regex::Token::T_MINUS => "-",
@@ -303,25 +269,20 @@ impl IRGenerator {
                     crate::lexer_regex::Token::T_GEQ => ">=",
                     crate::lexer_regex::Token::T_AND => "&&",
                     crate::lexer_regex::Token::T_OR => "||",
-                    crate::lexer_regex::Token::T_ASSIGNOP => "=", // assignment should come from Var decl / ExprStmt, but keep as fallback
+                    crate::lexer_regex::Token::T_ASSIGNOP => "=",
                     _ => "op",
                 }.to_string();
 
-                // If the AST uses assignment as binary op, we put it here:
                 if let crate::lexer_regex::Token::T_ASSIGNOP = op {
-                    // lhs must be an identifier; try to resolve to a local
                     match lhs.as_ref() {
                         Expr::Ident(ident) => {
                             let lname = IRGenerator::local_name(ident.as_str());
                             let loperand = Operand::Local(lname.clone());
-                            // evaluate rhs -> r, then assign to local
                             out.push(Instr::Assign { dest: loperand.clone(), src: r.clone() });
-                            // return assigned value
                             Some(loperand)
                         }
                         _ => {
                             self.errors.push(IRGenError::Other("assignment target not an identifier".into()));
-                            // fallback: emit binary anyway
                             out.push(Instr::Binary { op: opname, dest: dest.clone(), lhs: l, rhs: r });
                             Some(dest)
                         }
@@ -332,13 +293,12 @@ impl IRGenerator {
                 }
             }
             Call { name, args } => {
-                // Evaluate all args, push param instrs in order
                 let mut arg_ops = Vec::new();
                 for a in args {
                     if let Some(ao) = self.lower_expr(a, out) {
                         arg_ops.push(ao);
                     } else {
-                        arg_ops.push(Operand::IntLit("0".into())); // fallback
+                        arg_ops.push(Operand::IntLit("0".into())); 
                     }
                 }
 
@@ -346,7 +306,6 @@ impl IRGenerator {
                     out.push(Instr::Param(ao.clone()));
                 }
 
-                // if call returns something, allocate dest temp
                 let dest = self.new_temp();
                 out.push(Instr::Call { dest: Some(dest.clone()), name: name.clone(), nargs: arg_ops.len() });
                 Some(dest)
@@ -354,3 +313,4 @@ impl IRGenerator {
         }
     }
 }
+
