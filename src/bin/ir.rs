@@ -14,19 +14,15 @@ fn main() {
         int b = add(a, 10);
     "#;
 
-    // 1. Lexing
     let lexer = Lexer::new();
     let tokens = lexer.tokenize(src);
 
-    // 2. Parsing
     let mut parser = Parser::new(tokens);
     let prog = parser.parse_program().expect("Parse error");
 
-    // 3. Scope analysis
     let mut sa = ScopeAnalyzer::new();
     sa.analyze(&prog);
 
-    // 4. IR generation
     let mut irgen = IRGenerator::new();
     let ir = irgen.generate(&prog);
 
@@ -39,3 +35,4 @@ fn main() {
         println!();
     }
 }
+
